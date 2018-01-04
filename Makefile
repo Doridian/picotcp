@@ -63,6 +63,7 @@ IPC?=0
 CYASSL?=0
 WOLFSSL?=0
 POLARSSL?=0
+WSTAP?=0
 
 #IPv6 related
 IPV6?=1
@@ -243,7 +244,8 @@ POSIX_OBJ+= modules/pico_dev_vde.o \
             modules/pico_dev_tun.o \
             modules/pico_dev_ipc.o \
             modules/pico_dev_tap.o \
-            modules/pico_dev_mock.o
+            modules/pico_dev_mock.o \
+            modules/pico_dev_wstap.o
 
 include rules/debug.mk
 
@@ -332,6 +334,9 @@ ifneq ($(6LOWPAN), 0)
 endif
 ifneq ($(IPC),0)
   include rules/ipc.mk
+endif
+ifneq ($(WSTAP),0)
+  include rules/wstap.mk
 endif
 ifneq ($(CYASSL),0)
   include rules/cyassl.mk
