@@ -8,8 +8,8 @@
 #include "pico_config.h"
 #include "pico_device.h"
 
-void pico_wstap_destroy(struct pico_device *ipc);
-struct pico_device *pico_wstap_create(const char *sock_path, const char *name, const uint8_t *mac);
+void pico_wstap_destroy(struct pico_device *wstap);
+struct pico_device *pico_wstap_create(int fd, const char *name, const uint8_t *mac);
 
 #endif
 
