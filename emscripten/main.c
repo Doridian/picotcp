@@ -10,6 +10,7 @@
 static uint32_t xid;
 
 extern void js_wstap_socket_ev(uint16_t ev, struct pico_socket *s);
+extern void js_wstap_dhcp_ev(void* cli, int code);
 
 struct pico_socket* pico_socket_open_cb(uint16_t net, uint16_t proto)
 {
@@ -25,7 +26,7 @@ int main()
 
 static void callback_dhcpclient(void* cli, int code)
 {
-    dbg("Got DHCP code %d\n", code);
+	js_wstap_dhcp_ev(pico_dhcp_get_device(cli), code);
 }
 
 struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac)

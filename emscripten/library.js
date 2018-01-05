@@ -35,6 +35,13 @@ mergeInto(LibraryManager.library, {
 			return;
 		}
 		socket._socket_cb(ev);
-	}
+	},
+	js_wstap_dhcp_ev: function (dev, code) {
+		const wstap = Module._wstap_devs[dev];
+		if (!wstap) {
+			return;
+		}
+		wstap._dhcp_event(code);
+	},
 });
 

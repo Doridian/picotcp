@@ -3,7 +3,9 @@
 var Module = {};
 
 const wstaps = {};
+const wstap_devs = {};
 Module._wstaps = wstaps;
+Module._wstap_devs = wstap_devs;
 let lastfd = 0;
 
 function WSTAP(addr) {
@@ -34,7 +36,11 @@ function WSTAP(addr) {
 			}
 
 			// struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac);
-			this.dev = Module.ccall('pico_wstap_create_simple', 'number', ['number','number','number'], [nameptr, this.id, macptr]);
+			if (this.dev !== null) {
+				delete this.wstap_devs[this.dev];
+			}
+			this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr);
+			wstap_devs[this.dev] = this;
 
 			Module._free(nameptr);
 			Module._free(macptr);
@@ -55,7 +61,7 @@ function WSTAP(addr) {
 }
 WSTAP.prototype.close = function() {
 	if (this.dev) {
-		Module.ccall('pico_wstap_destroy', 'void', ['number'], [this.dev]);
+		Module._pico_wstap_destroy(this.dev);
 	}
 	this._close();
 };
@@ -79,6 +85,14 @@ WSTAP.prototype._poll = function() {
 WSTAP.prototype._close = function() {
 	this.ws.close();
 	delete wstaps[this.id];
+	if (this.dev !== null) {
+		delete wstap_devs[this.dev];
+	}
+};
+WSTAP.prototype._dhcp_event = function(code) {
+	if (code === 0 && this.onready) {
+		this.onready();
+	}
 };
 
 Module.NET = {
@@ -112,7 +126,7 @@ Socket.prototype.connect = function (ip, port) {
 	}
 };
 Socket.prototype._socket_cb = function (ev) {
-	console.log('Got event ', ev);
+	console.log('TODO: Handle socket event: ', ev); // TODO
 };
 Socket.prototype.close = function () {
 	Module._pico_socket_close(this.fd);
