@@ -46,7 +46,11 @@ function WSTAP(addr) {
 			Module._free(macptr);
 		} else {
 			this.buffer.push(new Uint8Array(data));
+			while (this.buffer.length > 0) {
+				Module._pico_stack_tick();
+			}
 		}
+		Module._pico_stack_tick();
 	};
 	this.ws.onclose = () => {
 		this.close();
