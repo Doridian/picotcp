@@ -218,6 +218,7 @@ Socket.prototype.close = function () {
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 };
+// TODO: Send queue!
 Socket.prototype.write = function (data) {
 	const ptr = Module._malloc(data.byteLength);
 	if (ptr <= 0) {
@@ -251,7 +252,7 @@ Socket.prototype.read = function (len) {
 	try {
 		const ret = Module._pico_socket_read(this.fd, ptr, len);
 		if (ret < 0) {
-			return undefined;
+			throw new Error('Error reading from socket');
 		}
 		const u8 = new Uint8Array(ret);
 		u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
@@ -274,6 +275,9 @@ Socket.prototype.readAll = function () {
 			u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
 			data.push(u8);
 			dataLen += ret;
+		}
+		if (ret < 0) {
+			throw new Error('Error reading from socket');
 		}
 		
 	} finally {
