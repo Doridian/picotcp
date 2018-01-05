@@ -29,7 +29,7 @@ mergeInto(LibraryManager.library, {
 		}
 		return wstap._poll();
 	},
-	js_wstap_socket_ev: function (fd, ev) {
+	js_wstap_socket_ev: function (ev, fd) {
 		const socket = Module._sockets[fd];
 		if (!socket) {
 			return;
