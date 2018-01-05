@@ -217,6 +217,7 @@ Socket.prototype.close = function () {
 	if (this.fd === undefined) {
 		return;
 	}
+	this._sendReady = false;
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 	this.fd = undefined;
@@ -228,7 +229,7 @@ Socket.prototype.close = function () {
 Socket.prototype._send = function (ptr, len) {
 	if (this.fd === undefined) {
 		Module._free(ptr);
-		throw new Error('Cannot send. Socket closed');
+		throw new Error('Socket closed');
 	}
 	this.wbuffer.push({
 		ptr,
@@ -274,6 +275,9 @@ Socket.prototype.writeString = function (str) {
 	return this._send(ptr, len);
 };
 Socket.prototype.read = function (len) {
+	if (this.fd === undefined) {
+		throw new Error('Socket closed');
+	}
 	const ptr = Module._malloc(len);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
@@ -291,6 +295,9 @@ Socket.prototype.read = function (len) {
 	}
 };
 Socket.prototype.readAll = function () {
+	if (this.fd === undefined) {
+		throw new Error('Socket closed');
+	}
 	const data = [];
 	let dataLen = 0;
 	const ptr = Module._malloc(1024);
