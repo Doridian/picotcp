@@ -246,6 +246,7 @@ Socket.prototype._sendPump = function () {
 		data.sptr += wlen;
 		data.len -= wlen;
 	}
+	Module._pico_stack_tick();
 };
 Socket.prototype.write = function (data) {
 	const ptr = Module._malloc(data.byteLength);
