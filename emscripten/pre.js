@@ -18,26 +18,31 @@ function makeEventEmitter(Cls) {
 		}
 	};
 	Cls.prototype.on = function(ev, func) {
-		this._eventSetup('events', ev);
-		this.events[ev].push(func);
+		this._eventSetup('_events', ev);
+		this._events[ev].push(func);
 	};
 	Cls.prototype.emit = function(ev, data) {
-		if (!this._events) {
-			return;
+		if (this._events) {
+			const evs = this._events[ev];
+			if (evs) {
+				for (let i = 0; i < evs.length; i++) {
+					evs[i](data);
+				}
+			}
 		}
-		let evs = this.events[ev];
-		for (let i = 0; i < evs.length; i++) {
-			evs[i](data);
-		}
-		evs = this.eventsOnce[ev];
-		delete this.eventsOnce[ev];
-		for (let i = 0; i < evs.length; i++) {
-			evs[i](data);
+		if (this._eventsOnce) {
+			const evs = this._eventsOnce[ev];
+			if (evs) {
+				delete this._eventsOnce[ev];
+				for (let i = 0; i < evs.length; i++) {
+					evs[i](data);
+				}
+			}
 		}
 	};
 	Cls.prototype.once = function(ev, func) {
-		this._eventSetup('eventsOnce', ev);
-		this.eventsOnce[ev].push(func);
+		this._eventSetup('_eventsOnce', ev);
+		this._eventsOnce[ev].push(func);
 	};
 	Cls.prototype._eventRemove = function(ev, func, _evs) {
 		if (!_evs || !_evs[ev]) {
@@ -55,10 +60,10 @@ function makeEventEmitter(Cls) {
 		}
 	};
 	Cls.prototype.removeOn = function(ev, func) {
-		this._eventRemove(ev, func, this.events);
+		this._eventRemove(ev, func, this._events);
 	};
 	Cls.prototype.removeOnce = function(ev, func) {
-		this._eventRemove(ev, func, this.eventsOnce);
+		this._eventRemove(ev, func, this._eventsOnce);
 	};
 }
 
@@ -148,6 +153,8 @@ Module._sockets = {};
 
 function Socket(proto = Socket.PROTO.TCP, net = Socket.PROTO.IPV4) {
 	this.fd = Module._pico_socket_open_cb(net, proto);
+	this.net = net;
+	this.proto = proto;
 	Module._sockets[this.fd] = this;
 }
 makeEventEmitter(Socket);
@@ -192,12 +199,15 @@ Socket.prototype._socket_cb = function (ev) {
 			break;
 		case Socket.EVENT.CLOSE:
 			this.emit('closed');
+			this.close();
 			break;
 		case Socket.EVENT.FIN:
 			this.emit('fin');
+			this.close();
 			break;
 		case Socket.EVENT.ERROR:
 			this.emit('error');
+			this.close();
 			break;
 		default:
 			console.error('Unknown socket event: ' + ev);
@@ -205,6 +215,7 @@ Socket.prototype._socket_cb = function (ev) {
 	}
 };
 Socket.prototype.close = function () {
+	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 };
 Socket.prototype.write = function (data) {
@@ -240,7 +251,7 @@ Socket.prototype.read = function (len) {
 	try {
 		const ret = Module._pico_socket_read(this.fd, ptr, len);
 		if (ret < 0) {
-			throw new Error('Error reading from socket: ' + ret);
+			return undefined;
 		}
 		const u8 = new Uint8Array(ret);
 		u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
@@ -249,8 +260,50 @@ Socket.prototype.read = function (len) {
 		Module._free(ptr);
 	}
 };
+Socket.prototype.readAll = function () {
+	const data = [];
+	let dataLen = 0;
+	const ptr = Module._malloc(1024);
+	if (ptr <= 0) {
+		throw new Error('Error allocating memory');
+	}
+	try {
+		let ret = -1;
+		while ((ret = Module._pico_socket_read(this.fd, ptr, 1024)) > 0) {
+			const u8 = new Uint8Array(ret);
+			u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
+			data.push(u8);
+			dataLen += ret;
+		}
+		
+	} finally {
+		Module._free(ptr);
+	}
+	if (dataLen === 0) {
+		return undefined;
+	}
+	const ret = new Uint8Array(dataLen);
+	let pos = 0;
+	for (let i = 0; i < data.length; i++) {
+		const d = data[i];
+		ret.set(d, pos);
+		pos += d.byteLength;
+	}
+	return ret;
+};
 Socket.prototype.readString = function (len) {
-	return new TextDecoder('utf-8').decode(this.read(len));
+	const data = this.read(len);
+	if (!data) {
+		return undefined;
+	}
+	return new TextDecoder('utf-8').decode(data);
+};
+Socket.prototype.readAllString = function () {
+	const data = this.readAll();
+	if (!data) {
+		return undefined;
+	}
+	return new TextDecoder('utf-8').decode(data);
 };
 
 Module.Socket = Socket;

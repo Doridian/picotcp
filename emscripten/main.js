@@ -13,7 +13,12 @@ function connect() {
 	socket = new Module.Socket();
 	window.socket = socket;
 	socket.connect('10.1.0.1', 8000);
-	socket.on('data');
+	socket.once('ready', () => {
+		console.log('TX', socket.writeString('GET / HTTP/1.1\nTest: ' + 'a'.repeat(1500) + '\n\n'));
+	});
+	socket.on('data', () => {
+		console.log('RX', socket.readAllString());
+	});
 }
 
 function main() {
