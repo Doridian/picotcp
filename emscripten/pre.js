@@ -22,8 +22,6 @@ function WSTAP(addr) {
 
 			this.mtu = parseInt(spl[1], 10);
 			console.log(`Link-MTU: ${this.mtu}`);
-			this.mtu -= 4;
-			console.log(`TAP-MTU: ${this.mtu}`);
 
 			const name = 'wst' + this.id;
 			const nameptr = Module._malloc(name.length + 1);
