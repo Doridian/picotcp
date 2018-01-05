@@ -8,6 +8,61 @@ Module._wstaps = wstaps;
 Module._wstap_devs = wstap_devs;
 let lastfd = 0;
 
+function makeEventEmitter(Cls) {
+	Cls.prototype._eventSetup = function(ev, evs) {
+		if (!this[evs]) {
+			this[evs] = {};
+		}
+		if (ev && !this[evs][ev]) {
+			this[evs][ev] = [];
+		}
+	};
+	Cls.prototype.on = function(ev, func) {
+		this._eventSetup(ev, 'events');
+		this.events[ev].push(func);
+	};
+	Cls.prototype.emit = function(ev, data) {
+		if (!this._events) {
+			return;
+		}
+		let evs = this.events[ev];
+		for (let i = 0; i < evs.length; i++) {
+			evs[i](data);
+		}
+		evs = this.eventsOnce[ev];
+		delete this.eventsOnce[ev];
+		for (let i = 0; i < evs.length; i++) {
+			evs[i](data);
+		}
+	};
+	Cls.prototype.once = function(ev, func) {
+		this._eventSetup(ev, 'eventsOnce');
+		this.eventsOnce[ev].push(func);
+	};
+	Cls.prototype._eventRemove = function(ev, func, _evs) {
+		this._eventSetup();
+		if (!this.events[ev]) {
+			return;
+		}
+		const evs = _evs[ev];
+		for (let i = 0; i < evs.length; i++) {
+			if (evs[i] === func) {
+				evs.splice(i, 1);
+				break;
+			}
+		}
+		if (evs.length === 0) {
+			delete _evs[ev];
+		}
+	};
+	Cls.prototype.removeOn = function(ev, func) {
+		this._eventRemove(ev, func, this.events);
+	};
+	Cls.prototype.removeOnce = function(ev, func) {
+		this._eventRemove(ev, func, this.eventsOnce);
+	};
+}
+
 function WSTAP(addr) {
 	this.ready = false;
 	this.ws = new WebSocket(addr);
@@ -33,7 +88,7 @@ function WSTAP(addr) {
 			}
 
 			// struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac);
-			if (this.dev !== null) {
+			if (this.dev !== undefined) {
 				delete this.wstap_devs[this.dev];
 			}
 			this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr, this.mtu);
@@ -58,8 +113,9 @@ function WSTAP(addr) {
 	};
 	this.id = lastfd++;
 	wstaps[this.id] = this;
-	this.dev = null;
+	this.dev = undefined;
 }
+makeEventEmitter(WSTAP);
 WSTAP.prototype.close = function() {
 	if (this.dev) {
 		Module._pico_wstap_destroy(this.dev);
@@ -74,24 +130,15 @@ WSTAP.prototype._write = function(bufptr, buflen) {
 WSTAP.prototype._close = function() {
 	this.ws.close();
 	delete wstaps[this.id];
-	if (this.dev !== null) {
+	if (this.dev !== undefined) {
 		delete wstap_devs[this.dev];
 	}
 };
 WSTAP.prototype._dhcp_event = function(code) {
-	if (code === 0 && !this.ready && this.onready) {
-		this.onready();
+	if (code === 0 && !this.ready) {
+		this.emit('ready');
 		this.ready = true;
 	}
-};
-
-Module.NET = {
-	IPV4: 0,
-	IPV6: 41,
-};
-Module.PROTO = {
-	TCP: 6,
-	UDP: 17,
 };
 
 function htons(n) {
@@ -100,23 +147,63 @@ function htons(n) {
 
 Module._sockets = {};
 
-function Socket(proto = Module.PROTO.TCP, net = Module.PROTO.IPV4) {
+function Socket(proto = Socket.PROTO.TCP, net = Socket.PROTO.IPV4) {
 	this.fd = Module._pico_socket_open_cb(net, proto);
 	Module._sockets[this.fd] = this;
 }
+makeEventEmitter(Socket);
+Socket.NET = {
+	IPV4: 0,
+	IPV6: 41,
+};
+Socket.PROTO = {
+	TCP: 6,
+	UDP: 17,
+};
+Socket.EVENT = {
+	READ: 1,
+	WRITE: 2,
+	CONNECTION: 4,
+	CLOSE: 8,
+	FIN: 16,
+	ERROR: 128,
+};
 Socket.prototype.connect = function (ip, port) {
 	const ipptr = Module._malloc(4);
 	try {
 		const ipsplit = ip.split('.');
-		for (let i = 0; i < 4; i++)
+		for (let i = 0; i < 4; i++) {
 			Module.HEAPU8[ipptr + i] = parseInt(ipsplit[i], 10);
+		}
 		return Module._pico_socket_connect(this.fd, ipptr, htons(port));
 	} finally {
 		Module._free(ipptr);
 	}
 };
 Socket.prototype._socket_cb = function (ev) {
-	console.log('TODO: Handle socket event: ', ev); // TODO
+	switch (ev) {
+		case Socket.EVENT.READ:
+			this.emit('data');
+			break;
+		case Socket.EVENT.WRITE:
+			this.emit('ready');
+			break;
+		case Socket.EVENT.CONNECTION:
+			this.emit('connected');
+			break;
+		case Socket.EVENT.CLOSE:
+			this.emit('closed');
+			break;
+		case Socket.EVENT.FIN:
+			this.emit('fin');
+			break;
+		case Socket.EVENT.ERROR:
+			this.emit('error');
+			break;
+		default:
+			console.error('Unknown socket event: ' + ev);
+			break;
+	}
 };
 Socket.prototype.close = function () {
 	Module._pico_socket_close(this.fd);
