@@ -177,6 +177,9 @@ Socket.EVENT = {
 	ERROR: 128,
 };
 Socket.prototype.connect = function (ip, port) {
+	if (this.fd === undefined) {
+		throw new Error('Socket closed');
+	}
 	const ipptr = Module._malloc(4);
 	try {
 		const ipsplit = ip.split('.');
