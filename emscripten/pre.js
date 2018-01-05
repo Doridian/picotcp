@@ -9,7 +9,7 @@ Module._wstap_devs = wstap_devs;
 let lastfd = 0;
 
 function makeEventEmitter(Cls) {
-	Cls.prototype._eventSetup = function(ev, evs) {
+	Cls.prototype._eventSetup = function(evs, ev) {
 		if (!this[evs]) {
 			this[evs] = {};
 		}
@@ -18,7 +18,7 @@ function makeEventEmitter(Cls) {
 		}
 	};
 	Cls.prototype.on = function(ev, func) {
-		this._eventSetup(ev, 'events');
+		this._eventSetup('events', ev);
 		this.events[ev].push(func);
 	};
 	Cls.prototype.emit = function(ev, data) {
@@ -36,12 +36,11 @@ function makeEventEmitter(Cls) {
 		}
 	};
 	Cls.prototype.once = function(ev, func) {
-		this._eventSetup(ev, 'eventsOnce');
+		this._eventSetup('eventsOnce', ev);
 		this.eventsOnce[ev].push(func);
 	};
 	Cls.prototype._eventRemove = function(ev, func, _evs) {
-		this._eventSetup();
-		if (!this.events[ev]) {
+		if (!_evs || !_evs[ev]) {
 			return;
 		}
 		const evs = _evs[ev];
