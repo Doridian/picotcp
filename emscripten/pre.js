@@ -155,6 +155,8 @@ function Socket(proto = Socket.PROTO.TCP, net = Socket.PROTO.IPV4) {
 	this.fd = Module._pico_socket_open_cb(net, proto);
 	this.net = net;
 	this.proto = proto;
+	this._sendReady = false;
+	this.wbuffer = [];
 	Module._sockets[this.fd] = this;
 }
 makeEventEmitter(Socket);
@@ -187,49 +189,64 @@ Socket.prototype.connect = function (ip, port) {
 	}
 };
 Socket.prototype._socket_cb = function (ev) {
-	switch (ev) {
-		case Socket.EVENT.READ:
-			this.emit('data');
-			break;
-		case Socket.EVENT.WRITE:
-			this.emit('ready');
-			break;
-		case Socket.EVENT.CONNECTION:
-			this.emit('connected');
-			break;
-		case Socket.EVENT.CLOSE:
-			this.emit('closed');
-			this.close();
-			break;
-		case Socket.EVENT.FIN:
-			this.emit('fin');
-			this.close();
-			break;
-		case Socket.EVENT.ERROR:
-			this.emit('error');
-			this.close();
-			break;
-		default:
-			console.error('Unknown socket event: ' + ev);
-			break;
+	if (ev & Socket.EVENT.READ) {
+		this.emit('data');
+	}
+	if (ev & Socket.EVENT.WRITE) {
+		this._sendReady = true;
+		this._sendPump();
+		this.emit('ready');
+	}
+	if (ev & Socket.EVENT.CONNECTION) {
+		this.emit('connected');
+	}
+	if (ev & Socket.EVENT.CLOSE) {
+		this.emit('close');
+	}
+	if (ev & Socket.EVENT.FIN) {
+		this.emit('fin');
+	}
+	if (ev & Socket.EVENT.ERROR) {
+		this.emit('error');
 	}
 };
 Socket.prototype.close = function () {
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 };
-// TODO: Send queue!
+Socket.prototype._send = function (ptr, len) {
+	this.wbuffer.push({
+		ptr,
+		len,
+		sptr: ptr,
+	});
+	this._sendPump();
+};
+Socket.prototype._sendPump = function () {
+	if (this.wbuffer.length === 0 || !this._sendReady) {
+		return;
+	}
+	this._sendReady = false;
+	const data = this.wbuffer[0];
+	const wlen = Module._pico_socket_write(this.fd, data.sptr, data.len);
+	if (wlen === data.len) {
+		Module._free(data.ptr);
+		this.wbuffer.shift();
+	} else if (wlen < 0) {
+		console.error('Error sending data');
+		this.close();
+	} else if (wlen > 0) {
+		data.sptr += wlen;
+		data.len -= wlen;
+	}
+};
 Socket.prototype.write = function (data) {
 	const ptr = Module._malloc(data.byteLength);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
-	try {
-		Module.HEAPU8.set(data, ptr);
-		return Module._pico_socket_write(this.fd, ptr, data.byteLength);
-	} finally {
-		Module._free(ptr);
-	}
+	Module.HEAPU8.set(data, ptr);
+	return this._send(ptr, data.byteLength);
 };
 Socket.prototype.writeString = function (str) {
 	const len = Module.lengthBytesUTF8(str);
@@ -237,12 +254,8 @@ Socket.prototype.writeString = function (str) {
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
-	try {
-		Module.stringToUTF8(str, ptr, len + 1);
-		return Module._pico_socket_write(this.fd, ptr, len);
-	} finally {
-		Module._free(ptr);
-	}
+	Module.stringToUTF8(str, ptr, len + 1);
+	return this._send(ptr, len);
 };
 Socket.prototype.read = function (len) {
 	const ptr = Module._malloc(len);
