@@ -10,7 +10,7 @@ let lastfd = 0;
 
 function WSTAP(addr) {
 	this.buffer = [];
-
+	this.ready = false;
 	this.ws = new WebSocket(addr);
 	this.ws.binaryType = 'arraybuffer';
 	this.ws.onmessage = (data) => {
@@ -90,8 +90,9 @@ WSTAP.prototype._close = function() {
 	}
 };
 WSTAP.prototype._dhcp_event = function(code) {
-	if (code === 0 && this.onready) {
+	if (code === 0 && !this.ready && this.onready) {
 		this.onready();
+		this.ready = true;
 	}
 };
 
