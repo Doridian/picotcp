@@ -12,10 +12,10 @@ function realmain() {
 function connect() {
 	socket = new Module.Socket();
 	window.socket = socket;
-	socket.connect('google.com', 80);
+	socket.connect('www.google.de', 80);
 	//socket.connect('172.217.21.110', 80);
 	socket.once('connected', () => {
-		socket.writeString('GET / HTTP/1.1\nConnection: close\n\n');
+		socket.writeString('GET / HTTP/1.1\nHost: www.google.de\nUser-Agent: picoHTTP\nConnection: close\n\n');
 	});
 	socket.on('data', () => {
 		console.log('RX', socket.readAllString());

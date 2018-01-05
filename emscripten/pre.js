@@ -303,7 +303,8 @@ Socket.prototype.read = function (len) {
 	try {
 		const ret = Module._pico_socket_read(this.fd, ptr, len);
 		if (ret < 0) {
-			throw new Error('Error reading from socket');
+			this.close();
+			return undefined;
 		}
 		const u8 = new Uint8Array(ret);
 		u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
@@ -331,7 +332,7 @@ Socket.prototype.readAll = function () {
 			dataLen += ret;
 		}
 		if (ret < 0) {
-			throw new Error('Error reading from socket');
+			this.close();
 		}
 		
 	} finally {
