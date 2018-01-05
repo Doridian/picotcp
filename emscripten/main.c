@@ -29,11 +29,11 @@ static void callback_dhcpclient(void* cli, int code)
 	js_wstap_dhcp_ev(pico_dhcp_get_device(cli), code);
 }
 
-struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac)
+struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac, const uint16_t mtu)
 {
     struct pico_device* dev;
 
-    dev = pico_wstap_create(fd, name, mac);
+    dev = pico_wstap_create(fd, name, mac, mtu);
     if (!dev) {
         return NULL;
     }

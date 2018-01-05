@@ -23,7 +23,7 @@ extern int js_wstap_read(int fd, char* data, int len);
 extern int js_wstap_write(int fd, char* data, int len);
 extern int js_wstap_poll(int fd);
 
-#define WSTAP_MTU 1280
+#define WSTAP_MTU 2048
 
 static int pico_wstap_send(struct pico_device *dev, void *buf, int len)
 {
@@ -59,14 +59,15 @@ void pico_wstap_destroy(struct pico_device *dev)
     }
 }
 
-struct pico_device *pico_wstap_create(int fd, const char *name, const uint8_t *mac)
+struct pico_device *pico_wstap_create(int fd, const char *name, const uint8_t *mac, const uint16_t mtu)
 {
     struct pico_device_wstap *wstap = PICO_ZALLOC(sizeof(struct pico_device_wstap));
 
-    if (!wstap)
+    if (!wstap) {
         return NULL;
+    }
 
-    wstap->dev.mtu = WSTAP_MTU;
+    wstap->dev.mtu = mtu;
 
     if( 0 != pico_device_init((struct pico_device *)wstap, name, mac)) {
         dbg("WSTAP init failed.\n");

@@ -37,7 +37,7 @@ function WSTAP(addr) {
 			if (this.dev !== null) {
 				delete this.wstap_devs[this.dev];
 			}
-			this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr);
+			this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr, this.mtu);
 			wstap_devs[this.dev] = this;
 
 			Module._free(nameptr);
