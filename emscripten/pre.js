@@ -202,17 +202,24 @@ Socket.prototype._socket_cb = function (ev) {
 	}
 	if (ev & Socket.EVENT.CLOSE) {
 		this.emit('close');
+		this.close();
 	}
 	if (ev & Socket.EVENT.FIN) {
 		this.emit('fin');
+		this.close();
 	}
 	if (ev & Socket.EVENT.ERROR) {
 		this.emit('error');
+		this.close();
 	}
 };
 Socket.prototype.close = function () {
+	if (this.fd === undefined) {
+		return;
+	}
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
+	this.fd = undefined;
 };
 Socket.prototype._send = function (ptr, len) {
 	this.wbuffer.push({
