@@ -214,18 +214,22 @@ Socket.prototype._socket_cb = function (ev) {
 	}
 };
 Socket.prototype.close = function () {
+	this.wbuffer.forEach(obj => {
+		Module._free(obj.ptr);
+	});
+	this.wbuffer = [];
 	if (this.fd === undefined) {
 		return;
 	}
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 	this.fd = undefined;
-	this.wbuffer.forEach(obj => {
-		Module._free(obj.ptr);
-	});
-	this.wbuffer = [];
 };
 Socket.prototype._send = function (ptr, len) {
+	if (this.fd === undefined) {
+		Module._free(ptr);
+		throw new Error('Cannot send. Socket closed');
+	}
 	this.wbuffer.push({
 		ptr,
 		len,
