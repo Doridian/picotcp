@@ -221,9 +221,7 @@ Socket.prototype.close = function () {
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 	this.fd = undefined;
-	this.wbuffer.forEach(obj => {
-		Module._free(obj.ptr);
-	});
+	this.wbuffer.forEach(obj => Module._free(obj.ptr));
 	this.wbuffer = [];
 };
 Socket.prototype._send = function (ptr, len) {
