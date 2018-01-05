@@ -13,7 +13,7 @@ function makeEventEmitter(Cls) {
 		if (!this[evs]) {
 			this[evs] = {};
 		}
-		if (ev && !this[evs][ev]) {
+		if (!this[evs][ev]) {
 			this[evs][ev] = [];
 		}
 	};
