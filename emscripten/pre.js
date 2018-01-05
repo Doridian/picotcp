@@ -9,7 +9,6 @@ Module._wstap_devs = wstap_devs;
 let lastfd = 0;
 
 function WSTAP(addr) {
-	this.buffer = [];
 	this.ready = false;
 	this.ws = new WebSocket(addr);
 	this.ws.binaryType = 'arraybuffer';
@@ -43,10 +42,10 @@ function WSTAP(addr) {
 			Module._free(nameptr);
 			Module._free(macptr);
 		} else {
-			this.buffer.push(new Uint8Array(data));
-			while (this.buffer.length > 0) {
-				Module._pico_stack_tick();
-			}
+			const data8 = new Uint8Array(data);
+			const bufptr = Module._malloc(data8.byteLength);
+			Module.HEAPU8.set(data8, bufptr);
+			Module._pico_stack_recv(this.dev, bufptr, data8.byteLength);
 		}
 		Module._pico_stack_tick();
 	};
@@ -71,18 +70,6 @@ WSTAP.prototype._write = function(bufptr, buflen) {
 	const buf = new Uint8Array(Module.HEAPU8.buffer, bufptr, buflen);
 	this.ws.send(buf);
 	return buflen;
-};
-WSTAP.prototype._read = function(bufptr, buflen) {
-	const buf = new Uint8Array(Module.HEAPU8.buffer, bufptr, buflen);
-	if (this.buffer.length > 0) {
-		const wsbuf = this.buffer.shift();
-		Module.HEAPU8.set(wsbuf, bufptr);
-		return wsbuf.byteLength;
-	}
-	return 0;
-};
-WSTAP.prototype._poll = function() {
-	return this.buffer.length;
 };
 WSTAP.prototype._close = function() {
 	this.ws.close();

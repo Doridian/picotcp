@@ -19,11 +19,7 @@ struct pico_device_wstap {
 };
 
 extern int js_wstap_close(int fd);
-extern int js_wstap_read(int fd, char* data, int len);
 extern int js_wstap_write(int fd, char* data, int len);
-extern int js_wstap_poll(int fd);
-
-#define WSTAP_MTU 2048
 
 static int pico_wstap_send(struct pico_device *dev, void *buf, int len)
 {
@@ -33,20 +29,7 @@ static int pico_wstap_send(struct pico_device *dev, void *buf, int len)
 
 static int pico_wstap_poll(struct pico_device *dev, int loop_score)
 {
-    struct pico_device_wstap *wstap = (struct pico_device_wstap *) dev;
-    char buf[WSTAP_MTU + 20];
-    int len;
-    do  {
-        if (js_wstap_poll(wstap->fd) <= 0)
-            return loop_score;
-
-        len = js_wstap_read(wstap->fd, buf, WSTAP_MTU + 20);
-        if (len > 0) {
-            loop_score--;
-            pico_stack_recv(dev, buf, len);
-        }
-    } while(loop_score > 0);
-    return 0;
+    return loop_score;
 }
 
 /* Public interface: create/destroy. */
