@@ -15,10 +15,21 @@ static struct pico_ip4 dns_ips[2];
 
 extern void js_wstap_socket_ev(uint16_t ev, struct pico_socket *s);
 extern void js_wstap_dhcp_ev(void* cli, int code);
+extern void js_wstap_dns_ev(char *data, void* arg);
 
 struct pico_socket* pico_socket_open_cb(uint16_t net, uint16_t proto)
 {
 	return pico_socket_open(net, proto, js_wstap_socket_ev);
+}
+
+int pico_dns_client_getaddr_cb(const char *url, void *arg)
+{
+	return pico_dns_client_getaddr(url, js_wstap_dns_ev, arg);
+}
+
+int pico_dns_client_getname_cb(const char *ip, void *arg)
+{
+	return pico_dns_client_getname(ip, js_wstap_dns_ev, arg);
 }
 
 int main()

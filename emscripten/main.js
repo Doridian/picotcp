@@ -12,8 +12,11 @@ function realmain() {
 function connect() {
 	socket = new Module.Socket();
 	window.socket = socket;
-	socket.connect('10.1.0.1', 8000);
-	socket.writeString('GET / HTTP/1.1\nConnection: close\n\n');
+	socket.connect('google.com', 80);
+	//socket.connect('172.217.21.110', 80);
+	socket.once('connected', () => {
+		socket.writeString('GET / HTTP/1.1\nConnection: close\n\n');
+	});
 	socket.on('data', () => {
 		console.log('RX', socket.readAllString());
 	});

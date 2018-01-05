@@ -148,6 +148,7 @@ WSTAP.prototype._dhcp_event = function(code) {
 function htons(n) {
     return ((n & 0xFF) << 8) | ((n >> 8) & 0xFF);
 }
+const IPV4_REGEX = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/;
 
 Module._sockets = {};
 
@@ -176,17 +177,32 @@ Socket.EVENT = {
 	FIN: 16,
 	ERROR: 128,
 };
-Socket.prototype.connect = function (ip, port) {
+Socket.prototype.connect = function (ip, port, resolve = true) {
 	if (this.fd === undefined) {
 		throw new Error('Socket closed');
 	}
+
+	if (!IPV4_REGEX.test(ip)) {
+		if (!resolve) {
+			console.error('Not an IPv4, but no resolve option: ', ip);
+			return;
+		}
+		Module.DNS.getaddr(ip, (err, data) => {
+			if (err) {
+				return;
+			}
+			return this.connect(data, port, false);
+		});
+		return;
+	}
+
 	const ipptr = Module._malloc(4);
 	try {
 		const ipsplit = ip.split('.');
 		for (let i = 0; i < 4; i++) {
 			Module.HEAPU8[ipptr + i] = parseInt(ipsplit[i], 10);
 		}
-		return Module._pico_socket_connect(this.fd, ipptr, htons(port));
+		Module._pico_socket_connect(this.fd, ipptr, htons(port));
 	} finally {
 		Module._free(ipptr);
 	}
@@ -244,6 +260,7 @@ Socket.prototype._sendPump = function () {
 		return;
 	}
 	this._sendReady = false;
+
 	const data = this.wbuffer[0];
 	const wlen = Module._pico_socket_write(this.fd, data.sptr, data.len);
 	if (wlen === data.len) {
@@ -349,5 +366,30 @@ Socket.prototype.readAllString = function () {
 
 Module.Socket = Socket;
 Module.WSTAP = WSTAP;
+
+Module._dns_cbs = {};
+function _dns_call_cb(func, data, cb) {
+	const dataptr = Module._malloc(data.length + 1);
+	Module.writeAsciiToMemory(data, dataptr);
+
+	const id = Module._malloc(1);
+	Module._dns_cbs[id] = cb;
+	const res = func(dataptr, id);
+
+	Module._free(dataptr);
+
+	if (res) {
+		Module._free(id);
+		cb(new Error('Error sending DNS query'));
+	}
+}
+Module.DNS = {
+	getaddr: function(host, cb) {
+		_dns_call_cb(Module._pico_dns_client_getaddr_cb, host, cb);
+	},
+	getname: function(ip, cb) {
+		_dns_call_cb(Module._pico_dns_client_getname_cb, host, cb);
+	},
+};
 
 

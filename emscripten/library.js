@@ -20,14 +20,26 @@ mergeInto(LibraryManager.library, {
 		if (!socket) {
 			return;
 		}
-		socket._socket_cb(ev);
+		setTimeout(() => socket._socket_cb(ev), 0);
 	},
 	js_wstap_dhcp_ev: function (dev, code) {
 		const wstap = Module._wstap_devs[dev];
 		if (!wstap) {
 			return;
 		}
-		wstap._dhcp_event(code);
+		setTimeout(() => wstap._dhcp_event(code), 0);
 	},
+	js_wstap_dns_ev: function (dataptr, arg) {
+		const cbfunc = Module._dns_cbs[arg];
+		if (!cbfunc) {
+			Module._free(dataptr);
+			return;
+		}
+		Module._free(arg);
+		delete Module._dns_cbs[arg];
+		const data = Module.Pointer_stringify(dataptr);
+		Module._free(dataptr);
+		setTimeout(() => cbfunc(null, data), 0);
+	}
 });
 
