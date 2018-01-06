@@ -1,12 +1,11 @@
 'use strict';
-
 var Module = {};
 
-const wstaps = {};
-const wstap_devs = {};
+var wstaps = {};
+var wstap_devs = {};
 Module._wstaps = wstaps;
 Module._wstap_devs = wstap_devs;
-let lastfd = 0;
+var lastfd = 0;
 
 function makeEventEmitter(Cls) {
 	Cls.prototype._eventSetup = function(evs, ev) {
@@ -23,18 +22,18 @@ function makeEventEmitter(Cls) {
 	};
 	Cls.prototype.emit = function(ev, data) {
 		if (this._events) {
-			const evs = this._events[ev];
+			var evs = this._events[ev];
 			if (evs) {
-				for (let i = 0; i < evs.length; i++) {
+				for (var i = 0; i < evs.length; i++) {
 					evs[i](data);
 				}
 			}
 		}
 		if (this._eventsOnce) {
-			const evs = this._eventsOnce[ev];
+			var evs = this._eventsOnce[ev];
 			if (evs) {
 				delete this._eventsOnce[ev];
-				for (let i = 0; i < evs.length; i++) {
+				for (var i = 0; i < evs.length; i++) {
 					evs[i](data);
 				}
 			}
@@ -48,8 +47,8 @@ function makeEventEmitter(Cls) {
 		if (!_evs || !_evs[ev]) {
 			return;
 		}
-		const evs = _evs[ev];
-		for (let i = 0; i < evs.length; i++) {
+		var evs = _evs[ev];
+		for (var i = 0; i < evs.length; i++) {
 			if (evs[i] === func) {
 				evs.splice(i, 1);
 				break;
@@ -68,66 +67,71 @@ function makeEventEmitter(Cls) {
 }
 
 function WSTAP(addr) {
+	var self = this;
+
 	this.ready = false;
 	this.ws = new WebSocket(addr);
 	this.ws.binaryType = 'arraybuffer';
-	this.ws.onmessage = (data) => {
-		data = data.data;
-		if (typeof data === 'string') {
-			const spl = data.split('|');
-			this.mac = spl[0];
-			console.log(`MAC: ${this.mac}`);
 
-			this.mtu = parseInt(spl[1], 10);
-			console.log(`Link-MTU: ${this.mtu}`);
+	this.ws.onmessage = this._ws_onmessage.bind(this);
+	this.ws.onclose = this.close.bind(this);
+	this.ws.onerror = this.close.bind(this);
 
-			const name = 'wst' + this.id;
-			const nameptr = Module._malloc(name.length + 1);
-			Module.writeAsciiToMemory(name, nameptr);
-
-			const macptr = Module._malloc(6);
-			const macsplit = this.mac.split(':');
-			for (let i = 0; i < 6; i++) {
-				Module.HEAPU8[macptr + i] = parseInt(macsplit[i], 16);
-			}
-
-			// struct pico_device *pico_wstap_create_simple(const char *name, int fd, const uint8_t* mac);
-			if (this.dev !== undefined) {
-				delete this.wstap_devs[this.dev];
-			}
-			this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr, this.mtu);
-			wstap_devs[this.dev] = this;
-
-			Module._free(nameptr);
-			Module._free(macptr);
-		} else {
-			const data8 = new Uint8Array(data);
-			const bufptr = Module._malloc(data8.byteLength);
-			Module.HEAPU8.set(data8, bufptr);
-			Module._pico_stack_recv(this.dev, bufptr, data8.byteLength);
-		}
-		Module._pico_stack_tick();
-	};
-	this.ws.onclose = () => {
-		this.close();
-	};
-	this.ws.onerror = (err) => {
-		console.error(err);
-		this.close();
-	};
 	this.id = lastfd++;
 	wstaps[this.id] = this;
 	this.dev = undefined;
 }
+
+WSTAP.prototype._ws_onmessage = function (data) {
+	data = data.data;
+	if (typeof data === 'string') {
+		var spl = data.split('|');
+		this.mac = spl[0];
+		console.log('MAC: ' + this.mac);
+
+		this.mtu = parseInt(spl[1], 10);
+		console.log('Link-MTU: ' + this.mtu);
+
+		var name = 'wst' + this.id;
+		var nameptr = Module._malloc(name.length + 1);
+		Module.writeAsciiToMemory(name, nameptr);
+
+		var macptr = Module._malloc(6);
+		var macsplit = this.mac.split(':');
+		for (var i = 0; i < 6; i++) {
+			Module.HEAPU8[macptr + i] = parseInt(macsplit[i], 16);
+		}
+
+		// struct pico_device *pico_wstap_create_simple(var char *name, int fd, var uint8_t* mac);
+		if (this.dev !== undefined) {
+			delete this.wstap_devs[this.dev];
+		}
+		this.dev = Module._pico_wstap_create_simple(nameptr, this.id, macptr, this.mtu);
+		wstap_devs[this.dev] = this;
+
+		Module._free(nameptr);
+		Module._free(macptr);
+	} else {
+		var data8 = new Uint8Array(data);
+		var bufptr = Module._malloc(data8.byteLength);
+		Module.HEAPU8.set(data8, bufptr);
+		Module._pico_stack_recv(this.dev, bufptr, data8.byteLength);
+	}
+	Module._pico_stack_tick();
+};
+
 makeEventEmitter(WSTAP);
-WSTAP.prototype.close = function() {
+WSTAP.prototype.close = function(err) {
+	if (err) {
+		console.error(err);
+	}
 	if (this.dev) {
 		Module._pico_wstap_destroy(this.dev);
 	}
 	this._close();
 };
 WSTAP.prototype._write = function(bufptr, buflen) {
-	const buf = new Uint8Array(Module.HEAPU8.buffer, bufptr, buflen);
+	var buf = new Uint8Array(Module.HEAPU8.buffer, bufptr, buflen);
 	this.ws.send(buf);
 	return buflen;
 };
@@ -148,14 +152,14 @@ WSTAP.prototype._dhcp_event = function(code) {
 function htons(n) {
     return ((n & 0xFF) << 8) | ((n >> 8) & 0xFF);
 }
-const IPV4_REGEX = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/;
+var IPV4_REGEX = /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/;
 
 Module._sockets = {};
 
-function Socket(proto = Socket.PROTO.TCP, net = Socket.PROTO.IPV4) {
-	this.fd = Module._pico_socket_open_cb(net, proto);
-	this.net = net;
-	this.proto = proto;
+function Socket(proto, net) {
+	this.net = net || Socket.PROTO.IPV4;
+	this.proto = proto || Socket.PROTO.TCP;
+	this.fd = Module._pico_socket_open_cb(this.net, this.proto);
 	this._sendReady = false;
 	this.wbuffer = [];
 	Module._sockets[this.fd] = this;
@@ -177,7 +181,10 @@ Socket.EVENT = {
 	FIN: 16,
 	ERROR: 128,
 };
-Socket.prototype.connect = function (ip, port, resolve = true) {
+Socket.prototype.connect = function (ip, port, resolve) {
+	if (resolve === undefined) {
+		resolve = true;
+	}
 	if (this.fd === undefined) {
 		throw new Error('Socket closed');
 	}
@@ -187,19 +194,20 @@ Socket.prototype.connect = function (ip, port, resolve = true) {
 			console.error('Not an IPv4, but no resolve option: ', ip);
 			return;
 		}
-		Module.DNS.getaddr(ip, (err, data) => {
+		var self = this;
+		Module.DNS.getaddr(ip, function (err, data) {
 			if (err) {
 				return;
 			}
-			return this.connect(data, port, false);
+			return self.connect(data, port, false);
 		});
 		return;
 	}
 
-	const ipptr = Module._malloc(4);
+	var ipptr = Module._malloc(4);
 	try {
-		const ipsplit = ip.split('.');
-		for (let i = 0; i < 4; i++) {
+		var ipsplit = ip.split('.');
+		for (var i = 0; i < 4; i++) {
 			Module.HEAPU8[ipptr + i] = parseInt(ipsplit[i], 10);
 		}
 		Module._pico_socket_connect(this.fd, ipptr, htons(port));
@@ -240,7 +248,9 @@ Socket.prototype.close = function () {
 	delete Module._sockets[this.fd];
 	Module._pico_socket_close(this.fd);
 	this.fd = undefined;
-	this.wbuffer.forEach(obj => Module._free(obj.ptr));
+	for (var i = 0; i < this.wbuffer.length; i++) {
+		Module._free(this.wbuffer[i].ptr);
+	}
 	this.wbuffer = [];
 };
 Socket.prototype._send = function (ptr, len) {
@@ -249,8 +259,8 @@ Socket.prototype._send = function (ptr, len) {
 		throw new Error('Socket closed');
 	}
 	this.wbuffer.push({
-		ptr,
-		len,
+		ptr: ptr,
+		len: len,
 		sptr: ptr,
 	});
 	this._sendPump();
@@ -261,8 +271,8 @@ Socket.prototype._sendPump = function () {
 	}
 	this._sendReady = false;
 
-	const data = this.wbuffer[0];
-	const wlen = Module._pico_socket_write(this.fd, data.sptr, data.len);
+	var data = this.wbuffer[0];
+	var wlen = Module._pico_socket_write(this.fd, data.sptr, data.len);
 	if (wlen === data.len) {
 		Module._free(data.ptr);
 		this.wbuffer.shift();
@@ -276,7 +286,7 @@ Socket.prototype._sendPump = function () {
 	Module._pico_stack_tick();
 };
 Socket.prototype.write = function (data) {
-	const ptr = Module._malloc(data.byteLength);
+	var ptr = Module._malloc(data.byteLength);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
@@ -284,8 +294,8 @@ Socket.prototype.write = function (data) {
 	return this._send(ptr, data.byteLength);
 };
 Socket.prototype.writeString = function (str) {
-	const len = Module.lengthBytesUTF8(str);
-	const ptr = Module._malloc(len + 1);
+	var len = Module.lengthBytesUTF8(str);
+	var ptr = Module._malloc(len + 1);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
@@ -296,17 +306,17 @@ Socket.prototype.read = function (len) {
 	if (this.fd === undefined) {
 		throw new Error('Socket closed');
 	}
-	const ptr = Module._malloc(len);
+	var ptr = Module._malloc(len);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
 	try {
-		const ret = Module._pico_socket_read(this.fd, ptr, len);
+		var ret = Module._pico_socket_read(this.fd, ptr, len);
 		if (ret < 0) {
 			this.close();
 			return undefined;
 		}
-		const u8 = new Uint8Array(ret);
+		var u8 = new Uint8Array(ret);
 		u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
 		return u8;
 	} finally {
@@ -317,16 +327,16 @@ Socket.prototype.readAll = function () {
 	if (this.fd === undefined) {
 		throw new Error('Socket closed');
 	}
-	const data = [];
-	let dataLen = 0;
-	const ptr = Module._malloc(1024);
+	var data = [];
+	var dataLen = 0;
+	var ptr = Module._malloc(1024);
 	if (ptr <= 0) {
 		throw new Error('Error allocating memory');
 	}
 	try {
-		let ret = -1;
+		var ret = -1;
 		while ((ret = Module._pico_socket_read(this.fd, ptr, 1024)) > 0) {
-			const u8 = new Uint8Array(ret);
+			var u8 = new Uint8Array(ret);
 			u8.set(new Uint8Array(Module.HEAPU8.buffer, ptr, ret), 0);
 			data.push(u8);
 			dataLen += ret;
@@ -341,24 +351,24 @@ Socket.prototype.readAll = function () {
 	if (dataLen === 0) {
 		return undefined;
 	}
-	const ret = new Uint8Array(dataLen);
-	let pos = 0;
-	for (let i = 0; i < data.length; i++) {
-		const d = data[i];
+	var ret = new Uint8Array(dataLen);
+	var pos = 0;
+	for (var i = 0; i < data.length; i++) {
+		var d = data[i];
 		ret.set(d, pos);
 		pos += d.byteLength;
 	}
 	return ret;
 };
 Socket.prototype.readString = function (len) {
-	const data = this.read(len);
+	var data = this.read(len);
 	if (!data) {
 		return undefined;
 	}
 	return new TextDecoder('utf-8').decode(data);
 };
 Socket.prototype.readAllString = function () {
-	const data = this.readAll();
+	var data = this.readAll();
 	if (!data) {
 		return undefined;
 	}
@@ -370,12 +380,12 @@ Module.WSTAP = WSTAP;
 
 Module._dns_cbs = {};
 function _dns_call_cb(func, data, cb) {
-	const dataptr = Module._malloc(data.length + 1);
+	var dataptr = Module._malloc(data.length + 1);
 	Module.writeAsciiToMemory(data, dataptr);
 
-	const id = Module._malloc(1);
+	var id = Module._malloc(1);
 	Module._dns_cbs[id] = cb;
-	const res = func(dataptr, id);
+	var res = func(dataptr, id);
 
 	Module._free(dataptr);
 
@@ -392,5 +402,4 @@ Module.DNS = {
 		_dns_call_cb(Module._pico_dns_client_getname_cb, host, cb);
 	},
 };
-
-
+//*/

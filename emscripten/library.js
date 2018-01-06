@@ -20,14 +20,14 @@ mergeInto(LibraryManager.library, {
 		if (!socket) {
 			return;
 		}
-		setTimeout(() => socket._socket_cb(ev), 0);
+		setTimeout(function() { socket._socket_cb(ev) }, 0);
 	},
 	js_wstap_dhcp_ev: function (dev, code) {
 		const wstap = Module._wstap_devs[dev];
 		if (!wstap) {
 			return;
 		}
-		setTimeout(() => wstap._dhcp_event(code), 0);
+		setTimeout(function() { wstap._dhcp_event(code) }, 0);
 	},
 	js_wstap_dns_ev: function (dataptr, arg) {
 		const cbfunc = Module._dns_cbs[arg];
@@ -39,7 +39,7 @@ mergeInto(LibraryManager.library, {
 		delete Module._dns_cbs[arg];
 		const data = Module.Pointer_stringify(dataptr);
 		Module._free(dataptr);
-		setTimeout(() => cbfunc(null, data), 0);
+		setTimeout(function() { cbfunc(null, data) }, 0);
 	}
 });
 
